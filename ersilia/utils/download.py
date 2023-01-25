@@ -124,6 +124,9 @@ class GitHubDownloader(object):
         else:
             return False
 
+    def _download_zipped_model(self, org, repo, model):
+        logger.log("Checking if a model can be fetched as a Zip archive.")
+    
     def _clone_with_git(self, org, repo, destination):
         tmp_folder = os.path.abspath(tempfile.mkdtemp(prefix="ersilia-"))
         script = """
