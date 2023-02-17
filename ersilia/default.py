@@ -59,7 +59,7 @@ ERSILIA_WEB_URL = "https://ersilia.io"
 ERSILIA_MODEL_HUB_URL = "https://ersilia.io/model-hub"
 AIRTABLE_MODEL_HUB_VIEW_URL = "https://airtable.com/shrNc3sTtTA3QeEZu"
 S3_BUCKET_URL = "https://ersilia-models.s3.eu-central-1.amazonaws.com"
-
+S3_ZIP_BUCKET_URL = "https://ersilia-models-zipped.s3.eu-central-1.amazonaws.com"
 # EOS conda
 _resolve_script = "conda_env_resolve.py"
 resolve_script = os.path.join(EOS, _resolve_script)
