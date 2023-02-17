@@ -13,7 +13,7 @@ from click import echo
 from .terminal import run_command
 from .. import logger
 
-from ..default import S3_BUCKET_URL
+from ..default import S3_BUCKET_URL, S3_ZIP_BUCKET_URL
 
 
 class PseudoDownloader(object):
@@ -167,7 +167,12 @@ class GitHubDownloader(object):
         # This function takes S3 filename as input and tries to download it
         # from a location given in S3_BUCKET_URL at config.py
 
-        file_url = S3_BUCKET_URL + "/" + repo + "/" + filename
+        if repo == "zip":
+            filename=filename+".zip"
+            file_url=S3_ZIP_BUCKET_URL + "/" + filename
+        else:
+            file_url = S3_BUCKET_URL + "/" + repo + "/" + filename
+            
         local_filename = destination + "/" + filename
         try:
             with requests.get(file_url, stream=True) as r:
@@ -190,13 +195,52 @@ class GitHubDownloader(object):
                             )
                             sys.stdout.flush()
                     echo("✅\n")
-        except:
+            self.logger.success("File {} downloaded.".format(filename))
+            return True
+        except Exception as e: 
+            print(e)
             self.logger.error(
                 "❗Could not download file {} from S3 bucket.\n We will try Git LFS.".format(
                     file_url
                 )
             )
+            return False
 
+        
+    def _extract_zipped_model(self, model_name, destination):
+        zip_file=destination+"/"+model_name+".zip"
+        print(zip_file)
+        if (os.path.isfile(zip_file)):
+            self.logger.debug("File exists.")
+            try:
+                with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                    self.logger.debug("Unzipping the model.")
+                    #A hack to workaround zipping whole directories instead
+                    #of contents of a directory. This way we check the path
+                    #to the destination, so it moves up one level.
+                    #For example instead of extracting a zipfile into
+                    # /Users/ttokarczuk/eos/dest/eos4e40 we will extract files into
+                    # /Users/ttokarczuk/eos/dest/.
+                    zip_ref.extractall(os.path.dirname(destination))
+                    self.logger.success("File unzipped.")
+                    return True
+            except Exception as e:
+                self.logger.error(e)
+        else:
+            self.logger.error("File {0} doesn't exist.".format(zip_file))
+            return False
+
+    def _download_zipped_model(self, model_name, destination):
+        os.mkdir(destination)
+        if (self._download_s3_files(model_name, "zip", destination)):
+            return True
+        else:
+            os.rmdir(destination)
+            return False
+
+       # https://ersilia-models-zipped.s3.eu-central-1.amazonaws.com/eos4e40.zip
+
+    
     def _check_large_file_checksum(self, filename, destination):
         # This function takes filenames and checksums from lfs ls-files
         # and runs shasum -a 256 on actual files for comparison.
@@ -265,11 +309,27 @@ class GitHubDownloader(object):
                 shutil.rmtree(destination)
             else:
                 return
-        is_done = self._clone_with_git(org, repo, destination)
+        is_done = self._download_zipped_model(repo, destination)
+        print("is _download_zipped_model done? {0}".format(is_done))
+        if is_done:
+            is_done=self._extract_zipped_model(repo, destination)
+            print("is _extract_zipped_model done? {0}".format(is_done))
+
+        if not is_done:
+            is_done=self._clone_with_git(org, repo, destination)
+            print("is _clone_with_git done? {0}".format(is_done))
+
+            is_done=self._download_large_files(repo, destination)
+            print("is _download_large_files done? {0}".format(is_done))
+
+            # Just temporary setting is_done to true  to move forward
+            is_done=True
+
         if not is_done:
             raise Exception("Download from {0}/{1} did not work".format(org, repo))
+        #self._download_zipped_model(repo,destination)
 
-        self._download_large_files(repo, destination)
+        
 
         if ungit:
             self._ungit(destination)
